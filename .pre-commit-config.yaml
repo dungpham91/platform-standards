@@ -1,0 +1,57 @@
+# Local gate — run before commit. Install: pip install pre-commit && pre-commit install
+# Also run: bash scripts/install-git-hooks.sh (pre-push)
+
+minimum_pre_commit_version: "3.0.0"
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: detect-private-key
+      - id: no-commit-to-branch
+        args: [--branch, main, --branch, master]
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.96.2
+    hooks:
+      - id: terraform_fmt
+        files: ^src/problem1/terraform/
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.7
+    hooks:
+      - id: actionlint
+        files: ^\.github/workflows/
+
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.10.0
+    hooks:
+      - id: shellcheck
+        files: \.sh$
+
+  - repo: local
+    hooks:
+      - id: terraform-io-sort
+        name: terraform variables/outputs A-Z
+        entry: bash scripts/terraform-io-sort.sh --check
+        language: system
+        files: ^src/problem1/terraform/modules/.+/(variables|outputs)\.tf$
+        pass_filenames: false
+      - id: repo-mock-tests-quick
+        name: quick quality gate (scripts)
+        entry: bash scripts/quality-gate-quick.sh
+        language: system
+        pass_filenames: false
+        always_run: true

@@ -1,0 +1,12 @@
+# CodeDeploy AppSpec — revision zip must include appspec.yml and scripts/ (see problem4-backend-ci deploy job).
+version: 0.0
+os: linux
+files:
+  - source: scripts/
+    destination: /opt/devopslite-api/scripts/
+    overwrite: true
+hooks:
+  ApplicationStart:
+    - location: scripts/start-api.sh
+      timeout: 300
+      runas: root

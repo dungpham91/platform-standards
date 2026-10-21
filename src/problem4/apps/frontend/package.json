@@ -1,0 +1,10 @@
+{
+  "name": "trading-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.js",
+    "lint": "node --check scripts/build.js",
+    "test": "node --test test/build.test.js test/lint.test.js"
+  }
+}

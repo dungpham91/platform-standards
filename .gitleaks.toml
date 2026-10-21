@@ -1,0 +1,8 @@
+title = "devopslite platform-standards"
+
+[allowlist]
+description = "Baseline and example files — extend only with PR justification"
+paths = [
+  '''(^|/)\.secrets\.baseline$''',
+  '''terraform\.tfvars\.example$''',
+]
