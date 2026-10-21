@@ -39,7 +39,7 @@ jobs:
             --report-format sarif --report-path reports/gitleaks.sarif \
             --exit-code 1
       - name: Upload Gitleaks SARIF
-        uses: github/codeql-action/upload-sarif@8c78abb9b62512e3c45dea6559ffd924ed8549c8 # v3.28.0
+        uses: github/codeql-action/upload-sarif@48ab28a6f5dbc2a99bf1e0131198dd8f1df78169 # v3.28.0
         if: always()
         with:
           sarif_file: reports/gitleaks.sarif
@@ -71,13 +71,13 @@ jobs:
       - name: Checkov gate
         run: bash scripts/checkov-iac-gate.sh
       - name: Upload Checkov Terraform SARIF
-        uses: github/codeql-action/upload-sarif@8c78abb9b62512e3c45dea6559ffd924ed8549c8 # v3.28.0
+        uses: github/codeql-action/upload-sarif@48ab28a6f5dbc2a99bf1e0131198dd8f1df78169 # v3.28.0
         if: always()
         with:
           sarif_file: reports/checkov-terraform.sarif
           category: checkov-terraform
       - name: Upload Checkov Compose SARIF
-        uses: github/codeql-action/upload-sarif@8c78abb9b62512e3c45dea6559ffd924ed8549c8 # v3.28.0
+        uses: github/codeql-action/upload-sarif@48ab28a6f5dbc2a99bf1e0131198dd8f1df78169 # v3.28.0
         if: always()
         with:
           sarif_file: reports/checkov-docker-compose.sarif
@@ -96,7 +96,7 @@ jobs:
         env:
           SCAN_SEVERITY: ${{ env.SCAN_SEVERITY }}
       - name: Upload Trivy Terraform SARIF
-        uses: github/codeql-action/upload-sarif@8c78abb9b62512e3c45dea6559ffd924ed8549c8 # v3.28.0
+        uses: github/codeql-action/upload-sarif@48ab28a6f5dbc2a99bf1e0131198dd8f1df78169 # v3.28.0
         if: always()
         with:
           sarif_file: reports/trivy-terraform.sarif
@@ -175,7 +175,7 @@ jobs:
           trivy image --format table --severity ${{ env.SCAN_SEVERITY }} devopslite-trading-api:pr-scan
           trivy image --exit-code 1 --severity ${{ env.SCAN_SEVERITY }} devopslite-trading-api:pr-scan
       - name: Upload Trivy image SARIF
-        uses: github/codeql-action/upload-sarif@8c78abb9b62512e3c45dea6559ffd924ed8549c8 # v3.28.0
+        uses: github/codeql-action/upload-sarif@48ab28a6f5dbc2a99bf1e0131198dd8f1df78169 # v3.28.0
         if: always()
         with:
           sarif_file: reports/trivy-image.sarif
