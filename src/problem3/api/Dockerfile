@@ -1,10 +1,10 @@
-FROM node:22-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache wget
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-FROM node:22-alpine AS runtime
+FROM node:26-alpine AS runtime
 RUN apk add --no-cache wget \
   && addgroup -g 10001 app \
   && adduser -u 10001 -G app -s /bin/sh -D app
