@@ -1,0 +1,50 @@
+# =============================================================================
+# Workstation-local (never commit or push)
+# =============================================================================
+.local/
+.cursor/
+.cursorignore
+.cursorrules
+**/prompts.local/
+*.mdc.local
+.windsurfrules
+.aider*
+.continue/
+docs/examples/
+
+# =============================================================================
+# Secrets, Terraform state, env
+# =============================================================================
+**/slack_notify.zip
+**/deploy/scripts/image_uri
+
+*.tfplan
+*.tfstate
+*.tfstate.*
+.terraform/
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+secrets/
+*.secret
+
+# =============================================================================
+# OS, editors, logs
+# =============================================================================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.log
+tmp/
+out/
+dist/
+build/
+coverage/
+reports/
+*.sarif
+*.zip
+node_modules/

@@ -1,0 +1,35 @@
+name: slack-ci-alerts
+
+on:
+  workflow_run:
+    workflows:
+      - pr-quality-gate
+      - terraform-ci
+      - problem4-backend-ci
+      - problem4-frontend-ci
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  notify-failure:
+    if: >-
+      github.event.workflow_run.conclusion == 'failure'
+      && vars.SLACK_ALERTS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: ci-alerts
+    steps:
+      - name: Post to Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          payload=$(jq -n \
+            --arg repo "${{ github.repository }}" \
+            --arg name "${{ github.event.workflow_run.name }}" \
+            --arg url "${{ github.event.workflow_run.html_url }}" \
+            --arg branch "${{ github.event.workflow_run.head_branch }}" \
+            '{text: ("CI failed: " + $name + " on " + $repo + " branch " + $branch + " — " + $url)}')
+          curl -sf -X POST -H 'Content-type: application/json' --data "$payload" "$SLACK_WEBHOOK_URL"

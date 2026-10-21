@@ -1,0 +1,152 @@
+name: problem4-backend-ci
+
+# Image vulnerability scanning runs in pr-quality-gate.yml (backend-image-scan job).
+# One Docker build per run: local load on PR / non-deploy push; on main+DEPLOY_ENABLED, job `build` is skipped and `build-push-ecr` is the sole image build.
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "src/problem4/apps/backend/**"
+      - ".github/workflows/problem4-backend-ci.yml"
+  pull_request:
+    paths:
+      - "src/problem4/apps/backend/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'ap-southeast-1' }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || 'platform-trading-api' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/problem4/apps/backend
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/problem4/apps/backend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+
+  build:
+    needs: test
+    if: >-
+      vars.DEPLOY_ENABLED != 'true'
+      || github.event_name != 'push'
+      || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master')
+    runs-on: ubuntu-latest
+    outputs:
+      image_digest: ${{ steps.build.outputs.digest }}
+      image_tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - id: meta
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5 # v3.8.0
+      - name: Build image (CI)
+        id: build
+        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6.9.0
+        with:
+          context: src/problem4/apps/backend
+          push: false
+          load: true
+          tags: ${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.tag }}
+          provenance: false
+
+  build-push-ecr:
+    needs: test
+    if: >-
+      github.event_name == 'push'
+      && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+      && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      image_digest: ${{ steps.build.outputs.digest }}
+      image_tag: ${{ steps.meta.outputs.tag }}
+      image_uri: ${{ steps.meta.outputs.image_uri }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: aws-actions/configure-aws-credentials@5579c002bb4778aa43395ef1df492868a9a1c83f # v4.0.2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@06226755a7d2e62a46259474bc58fe2797189264 # v2.0.2
+      - id: meta
+        run: |
+          TAG="${GITHUB_SHA::7}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "image_uri=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${TAG}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5 # v3.8.0
+      - name: Build and push image to ECR
+        id: build
+        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6.9.0
+        with:
+          context: src/problem4/apps/backend
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.tag }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          provenance: false
+
+  deploy-ec2:
+    needs: build-push-ecr
+    if: >-
+      github.event_name == 'push'
+      && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+      && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: src/problem4/apps/backend
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: aws-actions/configure-aws-credentials@5579c002bb4778aa43395ef1df492868a9a1c83f # v4.0.2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Create CodeDeploy deployment
+        env:
+          CODEDEPLOY_APPLICATION: ${{ vars.CODEDEPLOY_APPLICATION }}
+          CODEDEPLOY_DEPLOYMENT_GROUP: ${{ vars.CODEDEPLOY_DEPLOYMENT_GROUP }}
+          CODEDEPLOY_REVISION_BUCKET: ${{ vars.CODEDEPLOY_REVISION_BUCKET }}
+          IMAGE_URI: ${{ needs.build-push-ecr.outputs.image_uri }}
+        run: |
+          set -euo pipefail
+          : "${CODEDEPLOY_APPLICATION:?Set repository variable CODEDEPLOY_APPLICATION when DEPLOY_ENABLED}"
+          : "${CODEDEPLOY_DEPLOYMENT_GROUP:?Set repository variable CODEDEPLOY_DEPLOYMENT_GROUP when DEPLOY_ENABLED}"
+          : "${CODEDEPLOY_REVISION_BUCKET:?Set repository variable CODEDEPLOY_REVISION_BUCKET when DEPLOY_ENABLED}"
+          : "${IMAGE_URI:?build-push-ecr did not produce image_uri}"
+
+          STAGE="$(mktemp -d)"
+          cp deploy/appspec.yaml "${STAGE}/appspec.yml"
+          mkdir -p "${STAGE}/scripts"
+          cp deploy/scripts/start-api.sh "${STAGE}/scripts/start-api.sh"
+          chmod +x "${STAGE}/scripts/start-api.sh"
+          printf '%s\n' "${IMAGE_URI}" > "${STAGE}/scripts/image_uri"
+
+          (cd "${STAGE}" && zip -r revision.zip appspec.yml scripts)
+
+          S3_KEY="codedeploy/${GITHUB_SHA}.zip"
+          aws s3 cp "${STAGE}/revision.zip" "s3://${CODEDEPLOY_REVISION_BUCKET}/${S3_KEY}"
+
+          aws deploy create-deployment \
+            --application-name "${CODEDEPLOY_APPLICATION}" \
+            --deployment-group-name "${CODEDEPLOY_DEPLOYMENT_GROUP}" \
+            --description "GHA release ${IMAGE_URI}" \
+            --revision "revisionType=S3,s3Location={bucket=${CODEDEPLOY_REVISION_BUCKET},key=${S3_KEY},bundleType=zip}"

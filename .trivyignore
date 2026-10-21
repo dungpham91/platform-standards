@@ -1,0 +1,3 @@
+# Documented exceptions — see docs/SECURITY-SCANNING.md (PR review required).
+# Internet-facing ALB is required for the public spot trading API (WAF on prod).
+AVD-AWS-0053

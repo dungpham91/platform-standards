@@ -1,0 +1,1 @@
+# Checkov repo-root config. Scan paths: scripts/iac-scan-paths.sh (CI: scripts/checkov-iac-gate.sh).
